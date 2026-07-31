@@ -19,6 +19,8 @@ def _device_ip() -> str:
         address = ipaddress.ip_address(value)
     except ValueError as exc:
         raise ValueError("请输入有效的设备 IP 地址") from exc
+    if address.is_unspecified or address.is_multicast or address.is_reserved:
+        raise ValueError("不允许访问未指定、组播或保留地址")
     if not (address.is_private or address.is_loopback or address.is_link_local):
         raise ValueError("只允许访问局域网设备地址")
     return f"[{address}]" if address.version == 6 else str(address)

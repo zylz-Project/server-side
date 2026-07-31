@@ -80,6 +80,10 @@ def init_db(app: Flask) -> None:
         connection.commit()
     finally:
         connection.close()
+    try:
+        database.chmod(0o600)
+    except OSError:
+        pass
 
 
 def ensure_admin(app: Flask) -> str | None:

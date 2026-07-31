@@ -15,8 +15,10 @@ from ..security import (
     csrf_protect,
     device_required,
     hash_token,
+    json_object,
     login_required,
     new_api_token,
+    provisioned_api_token,
 )
 
 
@@ -25,7 +27,7 @@ DEVICE_UID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{3,63}$")
 
 
 def _json() -> dict:
-    return request.get_json(silent=True) or {}
+    return json_object()
 
 
 def _normalize_uid(value: object) -> str:
@@ -203,8 +205,10 @@ def update_device(device_id: int):
     product_id = str(payload.get("product_id", row["product_id"])).strip()
     if not name:
         return api_error("设备名称不能为空")
-    if status not in {"active", "disabled"}:
+    if status not in {"pending", "active", "disabled"}:
         return api_error("无效的设备状态")
+    if status == "pending" and row["status"] != "pending":
+        return api_error("已处理的设备不能恢复为待激活状态")
     try:
         product_id = _validate_product(product_id)
     except ValueError as exc:
@@ -365,15 +369,16 @@ def device_activation_poll():
         return jsonify(status="pending", poll_after=3)
     if row["status"] == "disabled":
         return api_error("设备已停用", 403, "device_disabled")
-    if row["api_token_hash"]:
-        return jsonify(status="active", provisioned=True)
-    token = new_api_token()
+    token = provisioned_api_token(uid, claim_token)
+    token_hash = hash_token(token)
+    if row["api_token_hash"] and not hmac.compare_digest(row["api_token_hash"], token_hash):
+        return api_error("设备令牌已由管理员更新，请重新配置设备", 409, "token_rotated")
     get_db().execute(
         """
-        UPDATE devices SET api_token_hash=?, token_prefix=?, claim_token_hash=NULL,
+        UPDATE devices SET api_token_hash=?, token_prefix=?,
             last_seen_at=?, ip_address=? WHERE id=?
         """,
-        (hash_token(token), token[:10], utcnow(), request.remote_addr, row["id"]),
+        (token_hash, token[:10], utcnow(), request.remote_addr, row["id"]),
     )
     get_db().commit()
     return jsonify(status="active", api_token=token, product_id=row["product_id"])
@@ -401,7 +406,8 @@ def device_check_in():
         """
         UPDATE devices SET firmware_version=COALESCE(?, firmware_version),
             battery_level=COALESCE(?, battery_level),
-            flash_free=COALESCE(?, flash_free), ip_address=?, last_seen_at=?
+            flash_free=COALESCE(?, flash_free), ip_address=?, last_seen_at=?,
+            claim_token_hash=NULL
         WHERE id=?
         """,
         (firmware, battery, flash_free, request.remote_addr, now, g.device["id"]),

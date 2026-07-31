@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import functools
+import base64
 import hashlib
 import hmac
 import secrets
 
-from flask import g, jsonify, request, session
+from flask import current_app, g, jsonify, request, session
 
 from .database import get_db
 
@@ -17,6 +18,11 @@ def api_error(message: str, status: int = 400, code: str | None = None):
     if code:
         payload["code"] = code
     return jsonify(payload), status
+
+
+def json_object() -> dict:
+    payload = request.get_json(silent=True)
+    return payload if isinstance(payload, dict) else {}
 
 
 def csrf_token() -> str:
@@ -63,6 +69,16 @@ def hash_token(token: str) -> str:
 
 def new_api_token() -> str:
     return "zh_" + secrets.token_urlsafe(32)
+
+
+def provisioned_api_token(device_uid: str, claim_token: str) -> str:
+    secret = current_app.config["SECRET_KEY"]
+    if isinstance(secret, str):
+        secret = secret.encode("utf-8")
+    message = f"{device_uid}\0{claim_token}".encode("utf-8")
+    digest = hmac.new(secret, message, hashlib.sha256).digest()
+    encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return "zh_" + encoded
 
 
 def device_required(view):

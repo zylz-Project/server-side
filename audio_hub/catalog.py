@@ -75,12 +75,12 @@ class AudioStore:
         name = unicodedata.normalize("NFC", (filename or "").strip())
         if not name or name in {".", ".."}:
             raise AudioStoreError("文件名不能为空")
-        if "/" in name or "\\" in name or any(ord(ch) < 32 for ch in name):
+        if "/" in name or "\\" in name or '"' in name or any(ord(ch) < 32 for ch in name):
             raise AudioStoreError("文件名包含非法字符")
         if not name.lower().endswith(".opus"):
             raise AudioStoreError("只支持 .opus 文件")
-        if len(name.encode("utf-8")) > 240:
-            raise AudioStoreError("文件名过长")
+        if len(name.encode("utf-8")) > 63:
+            raise AudioStoreError("文件名过长，UTF-8 编码后不能超过 63 字节")
         return name
 
     @staticmethod
@@ -110,6 +110,7 @@ class AudioStore:
                         "size": stat.st_size,
                         "category": current_category,
                         "modified_at": int(stat.st_mtime),
+                        "modified_at_ns": stat.st_mtime_ns,
                     }
                 )
         return files
@@ -118,7 +119,7 @@ class AudioStore:
         digest = hashlib.sha256()
         for item in self.manifest(product_id):
             digest.update(
-                f"{item['category']}\0{item['name']}\0{item['size']}\0{item['modified_at']}\n".encode(
+                f"{item['category']}\0{item['name']}\0{item['size']}\0{item['modified_at_ns']}\n".encode(
                     "utf-8"
                 )
             )

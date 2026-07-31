@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
 from audio_hub import create_app
 from audio_hub.database import get_db
+from audio_hub.routes.system import _device_ip
 
 
 class AudioHubTestCase(unittest.TestCase):
@@ -119,7 +121,14 @@ class AudioHubTestCase(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["files"][0]["name"], "熊猫叫.opus")
         self.assertEqual(payload["files"][0]["category"], "animal")
-        self.assertIn(b'"name":"', response.data)
+        self.assertIn("熊猫叫.opus".encode("utf-8"), response.data)
+        self.assertNotIn(b"\\u718a", response.data)
+        item_start = response.data.index(b'"index":0')
+        name_position = response.data.index(b'"name":', item_start)
+        size_position = response.data.index(b'"size":', name_position)
+        category_position = response.data.index(b'"category":', size_position)
+        self.assertLess(name_position, size_position)
+        self.assertLess(size_position, category_position)
 
         download = self.client.get(
             "/api/download-idx/0?product=tail-wagging-panda"
@@ -132,6 +141,8 @@ class AudioHubTestCase(unittest.TestCase):
         csrf_token = self.login()
         for filename, content in [
             ("not-opus.mp3", b"data"),
+            ('bad"name.opus', b"data"),
+            ("很长的中文音频文件名称超过设备端所能保存的最大长度限制.opus", b"data"),
             ("large.opus", b"x" * 1025),
         ]:
             with self.subTest(filename=filename):
@@ -215,6 +226,16 @@ class AudioHubTestCase(unittest.TestCase):
         self.assertEqual(provisioned.status_code, 200)
         token = provisioned.get_json()["api_token"]
 
+        replayed = self.client.post(
+            "/api/device/activate",
+            json={
+                "device_id": "ESP32-TAIL-001",
+                "claim_token": registration["claim_token"],
+            },
+        )
+        self.assertEqual(replayed.status_code, 200)
+        self.assertEqual(replayed.get_json()["api_token"], token)
+
         check_in = self.client.post(
             "/api/device/v1/check-in",
             json={},
@@ -230,6 +251,82 @@ class AudioHubTestCase(unittest.TestCase):
             },
         )
         self.assertEqual(reused_claim.status_code, 401)
+
+    def test_pending_device_edit_does_not_activate_it(self) -> None:
+        registration = self.client.post(
+            "/api/device/register",
+            json={
+                "device_id": "ESP32-PENDING-EDIT",
+                "product_id": "dinosaur",
+            },
+        )
+        self.assertEqual(registration.status_code, 201)
+        csrf_token = self.login()
+        devices = self.client.get("/api/admin/devices").get_json()["devices"]
+        pending = next(item for item in devices if item["device_uid"] == "ESP32-PENDING-EDIT")
+        response = self.client.patch(
+            f"/api/admin/devices/{pending['id']}",
+            json={
+                "name": "待激活测试设备",
+                "product_id": "dinosaur",
+                "status": "pending",
+            },
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["device"]["status"], "pending")
+
+    def test_non_object_json_never_returns_500(self) -> None:
+        csrf_token = self.login()
+        cases = [
+            ("POST", "/api/auth/login", True),
+            ("POST", "/api/auth/change-password", True),
+            ("POST", "/api/admin/devices", True),
+            ("POST", "/api/admin/devices/activate", True),
+            ("POST", "/api/device/register", False),
+            ("POST", "/api/device/activate", False),
+        ]
+        for method, path, use_csrf in cases:
+            with self.subTest(path=path):
+                headers = {"X-CSRF-Token": csrf_token} if use_csrf else {}
+                response = self.client.open(
+                    path,
+                    method=method,
+                    json=[1],
+                    headers=headers,
+                )
+                self.assertLess(response.status_code, 500)
+                self.assertEqual(response.content_type, "application/json")
+
+    def test_runtime_database_is_private(self) -> None:
+        database = Path(self.app.config["DATABASE"])
+        self.assertEqual(database.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(database.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_favicon_and_proxy_address_validation(self) -> None:
+        favicon = self.client.get("/static/favicon.svg")
+        self.assertEqual(favicon.status_code, 200)
+        favicon.close()
+        for address in ["0.0.0.0", "224.0.0.1", "255.255.255.255"]:
+            with self.subTest(address=address):
+                with self.app.test_request_context(f"/?ip={address}"):
+                    with self.assertRaises(ValueError):
+                        _device_ip()
+        with self.app.test_request_context("/?ip=192.168.1.88"):
+            self.assertEqual(_device_ip(), "192.168.1.88")
+
+    def test_revision_changes_for_same_size_fast_replacement(self) -> None:
+        store = self.app.extensions["audio_store"]
+        path = store.directory("dinosaur", "animal") / "same-size.opus"
+        path.write_bytes(b"first")
+        first_revision = store.revision("dinosaur")
+        first_stat = path.stat()
+        path.write_bytes(b"other")
+        os.utime(
+            path,
+            ns=(first_stat.st_atime_ns, first_stat.st_mtime_ns + 1),
+        )
+        self.assertNotEqual(first_revision, store.revision("dinosaur"))
 
     def test_expired_activation_can_be_registered_again(self) -> None:
         first = self.client.post(

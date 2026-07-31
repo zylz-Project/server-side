@@ -48,7 +48,7 @@ ESP32 设备端                   Audio Hub 服务端                 管理员�
     │ ④ POST /api/device/activate    │                              │
     │ 再次使用 Claim Token 轮询 ─────>│                              │
     │                                │ 生成正式设备 API Token        │
-    │<── 200 API Token，只返回一次 ──│                              │
+    │<── 200 API Token ──────────────│                              │
     │ 保存 API Token 到 NVS          │                              │
     │ 删除本地 Claim Token           │                              │
     │                                │                              │
@@ -67,7 +67,8 @@ ESP32 设备端                   Audio Hub 服务端                 管理员�
 1. ESP32 注册后不会立即获得正式设备令牌。
 2. 管理员输入六位码，只是把服务端设备状态从 `pending` 改为 `active`。
 3. 管理员激活成功后，仍然由 ESP32 下一次轮询领取正式设备令牌。
-4. 正式设备令牌只在领取时返回一次，服务端数据库只保存令牌哈希。
+4. 在 ESP32 首次心跳成功前，同一 Claim Token 可以重试领取同一个正式令牌，避免响应丢包导致设备无法恢复。
+5. 服务端数据库只保存令牌哈希，不保存正式令牌明文。
 5. 之后所有心跳和受保护的音频请求都由 ESP32 携带正式令牌。
 
 ## 3. 服务地址和产品身份
@@ -258,8 +259,8 @@ Content-Type: application/json
 
 1. 生成正式 `api_token`。
 2. 数据库只保存 API Token 的 SHA-256 哈希和前缀。
-3. 清除 Claim Token 哈希，使 Claim Token 立即失效。
-4. 只在本次 HTTP 响应中把 API Token 明文发给 ESP32。
+3. 暂时保留 Claim Token 哈希，允许网络响应丢失时重新领取同一个 API Token。
+4. 在 HTTP 响应中把 API Token 明文发给 ESP32。
 
 服务端响应：
 
@@ -276,9 +277,11 @@ ESP32 收到后必须按以下顺序处理：
 1. 先把 `api_token` 写入 NVS 的 `api_token` 键。
 2. 检查 NVS 提交是否成功。
 3. 成功后再删除 NVS 中的 `claim_token` 和 `act_code`。
-4. 结束激活轮询，进入心跳状态。
+4. 结束激活轮询，立即发送第一次正式心跳。
 
-如果 API Token 写入 NVS 失败，ESP32 不应删除 Claim Token。
+服务端收到第一次使用 API Token 的有效心跳后，才会清除 Claim Token 哈希。此后旧 Claim Token 失效，不能再次领取令牌。
+
+如果 API Token 响应丢失或写入 NVS 失败，ESP32 不应删除 Claim Token，而应继续调用激活查询接口；服务端会返回同一个 API Token。
 
 正式令牌明文无法从服务端数据库恢复。令牌丢失时，需要管理员在后台重新生成令牌并重新配置设备，或者删除该设备后让它重新走绑定流程。
 

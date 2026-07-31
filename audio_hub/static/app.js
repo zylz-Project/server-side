@@ -407,7 +407,9 @@
     form.elements.id.value = device.id;
     form.elements.name.value = device.name;
     form.elements.product_id.value = device.product_id;
-    form.elements.status.value = device.status === "pending" ? "active" : device.status;
+    form.dataset.originalStatus = device.status;
+    form.elements.status.value = device.status;
+    form.elements.status.disabled = device.status === "pending";
     $("#device-modal-title").textContent = device.name;
     const strip = $("#device-detail-strip");
     strip.replaceChildren();
@@ -826,7 +828,10 @@
           body: {
             name: form.get("name"),
             product_id: form.get("product_id"),
-            status: form.get("status"),
+            status:
+              event.currentTarget.dataset.originalStatus === "pending"
+                ? "pending"
+                : form.get("status"),
           },
         });
         closeDialog("device-modal");

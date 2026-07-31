@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Audio Hub · 设备管理平台</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>
@@ -218,7 +219,7 @@
       <div class="detail-strip" id="device-detail-strip"></div>
       <label class="field"><span>设备名称</span><input name="name" maxlength="80" required></label>
       <label class="field"><span>产品型号</span><select name="product_id" id="edit-device-product" required></select></label>
-      <label class="field"><span>设备状态</span><select name="status"><option value="active">启用</option><option value="disabled">停用</option></select></label>
+      <label class="field"><span>设备状态</span><select name="status"><option value="pending">待激活</option><option value="active">启用</option><option value="disabled">停用</option></select></label>
       <div class="danger-zone"><div><strong>设备凭据</strong><p>轮换后旧令牌立即失效，设备需要写入新令牌。</p></div><button class="button button--secondary button--small" id="rotate-token" type="button">轮换令牌</button></div>
       <div class="modal-actions modal-actions--spread"><button class="button button--danger-ghost" id="delete-device" type="button">删除设备</button><span><button class="button button--ghost" type="button" data-close-dialog="device-modal">取消</button><button class="button button--primary" type="submit" value="default">保存更改</button></span></div>
     </form>

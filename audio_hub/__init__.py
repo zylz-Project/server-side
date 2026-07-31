@@ -34,6 +34,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     base_dir = Path(__file__).resolve().parent.parent
     data_dir = Path((test_config or {}).get("DATA_DIR", base_dir / "data"))
     data_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        data_dir.chmod(0o700)
+    except OSError:
+        pass
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_mapping(
@@ -55,8 +59,17 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
     if test_config:
         app.config.update(test_config)
+    # Flask 3 no longer reads the legacy JSON_SORT_KEYS config value.
+    # Preserve manifest field order and emit UTF-8 for existing ESP32 clients.
+    app.json.sort_keys = False
+    app.json.ensure_ascii = False
 
-    Path(app.config["DATA_DIR"]).mkdir(parents=True, exist_ok=True)
+    runtime_data_dir = Path(app.config["DATA_DIR"])
+    runtime_data_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        runtime_data_dir.chmod(0o700)
+    except OSError:
+        pass
     store = AudioStore(Path(app.config["AUDIO_DIR"]), app.config["MAX_FILE_SIZE"])
     store.ensure_directories()
     app.extensions["audio_store"] = store
@@ -104,6 +117,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         if request.path.startswith("/api/"):
             return jsonify(error="接口不存在"), 404
         return "Not Found", 404
+
+    @app.errorhandler(500)
+    def internal_error(_error):
+        if request.path.startswith("/api/"):
+            return jsonify(error="服务端内部错误"), 500
+        return "Internal Server Error", 500
 
     @app.get("/healthz")
     def healthz():
