@@ -1,9 +1,14 @@
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
 .venv/
 venv/
 env/
-.vscode/
+
+# Runtime state: contains the SQLite database and session secret.
+data/
+
+# Editor and operating-system files.
 .idea/
-*.log
 .DS_Store

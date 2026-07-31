@@ -1,0 +1,1 @@
+"""Audio Hub route blueprints."""

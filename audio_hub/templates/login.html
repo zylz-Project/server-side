@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>登录 · Audio Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="login-body">
+  <main class="login-layout">
+    <section class="login-visual" aria-label="产品平台介绍">
+      <div class="login-visual__glow login-visual__glow--one"></div>
+      <div class="login-visual__glow login-visual__glow--two"></div>
+      <div class="login-brand">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span>Audio Hub</span>
+      </div>
+      <div class="login-copy">
+        <span class="eyebrow eyebrow--light">ZYLZ DEVICE CLOUD</span>
+        <h1>让每一台智能玩具<br>都有清晰的身份与声音。</h1>
+        <p>集中管理三款产品、设备激活、在线状态和 Opus 音频下发。</p>
+      </div>
+      <div class="login-products" aria-label="支持的产品">
+        <div><span>🦊</span><strong>摇尾熊猫</strong></div>
+        <div><span>🐼</span><strong>爬行熊猫</strong></div>
+        <div><span>🦖</span><strong>互动恐龙</strong></div>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-card">
+        <div class="login-card__head">
+          <span class="mobile-brand"><span class="brand-mark">A</span> Audio Hub</span>
+          <span class="eyebrow">管理控制台</span>
+          <h2>欢迎回来</h2>
+          <p>使用管理员账号登录设备管理平台</p>
+        </div>
+
+        <form id="login-form" class="form-stack" novalidate>
+          <label class="field">
+            <span>用户名</span>
+            <span class="input-wrap">
+              <svg class="input-icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+              <input id="username" name="username" autocomplete="username" value="admin" required>
+            </span>
+          </label>
+          <label class="field">
+            <span>密码</span>
+            <span class="input-wrap">
+              <svg class="input-icon" aria-hidden="true"><use href="#icon-lock"></use></svg>
+              <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+              <button class="icon-button input-action" type="button" id="toggle-password" aria-label="显示密码">
+                <svg><use href="#icon-eye"></use></svg>
+              </button>
+            </span>
+          </label>
+          <div id="login-error" class="form-error" role="alert" hidden></div>
+          <button class="button button--primary button--large" id="login-button" type="submit">
+            <span>登录控制台</span>
+            <svg><use href="#icon-arrow"></use></svg>
+          </button>
+        </form>
+
+        <p class="login-hint">首次启动密码会输出在服务端终端中。</p>
+      </div>
+    </section>
+  </main>
+
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="icon-user" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></symbol>
+    <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  </svg>
+  <script src="{{ url_for('static', filename='login.js') }}" defer></script>
+</body>
+</html>

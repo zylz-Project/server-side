@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Audio Hub · 设备管理平台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#overview" data-nav="overview">
+        <span class="brand-mark">A</span>
+        <span class="brand-copy"><strong>Audio Hub</strong><small>Device Console</small></span>
+      </a>
+
+      <nav class="sidebar-nav" aria-label="主要导航">
+        <span class="nav-caption">工作台</span>
+        <button class="nav-item is-active" type="button" data-view="overview">
+          <svg><use href="#icon-grid"></use></svg><span>系统概览</span>
+        </button>
+        <button class="nav-item" type="button" data-view="devices">
+          <svg><use href="#icon-cpu"></use></svg><span>设备管理</span><span class="nav-badge" id="pending-badge" hidden>0</span>
+        </button>
+        <button class="nav-item" type="button" data-view="audio">
+          <svg><use href="#icon-music"></use></svg><span>音频中心</span>
+        </button>
+        <span class="nav-caption">系统</span>
+        <button class="nav-item" type="button" data-view="system">
+          <svg><use href="#icon-settings"></use></svg><span>系统设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+          <svg class="theme-sun"><use href="#icon-sun"></use></svg>
+          <svg class="theme-moon"><use href="#icon-moon"></use></svg>
+          <span>切换外观</span>
+        </button>
+        <div class="admin-chip">
+          <span class="avatar">{{ username[:1]|upper }}</span>
+          <span><strong>{{ username }}</strong><small>系统管理员</small></span>
+          <button class="icon-button" id="logout-button" type="button" title="退出登录">
+            <svg><use href="#icon-logout"></use></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-shell">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="mobile-menu" type="button" aria-label="打开菜单">
+          <svg><use href="#icon-menu"></use></svg>
+        </button>
+        <div>
+          <span class="eyebrow" id="page-eyebrow">工作台</span>
+          <h1 id="page-title">系统概览</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="server-pill"><i></i> 服务运行中</span>
+          <button class="icon-button" id="refresh-button" type="button" aria-label="刷新当前页面">
+            <svg><use href="#icon-refresh"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="view is-active" id="view-overview" data-view-panel="overview">
+          <div class="hero-card">
+            <div>
+              <span class="eyebrow eyebrow--light">DEVICE OPERATIONS</span>
+              <h2>设备与内容，一处掌握。</h2>
+              <p>查看三款产品的在线状态、激活进度和音频版本。</p>
+            </div>
+            <button class="button button--light" type="button" data-action="open-activate">
+              <svg><use href="#icon-link"></use></svg>输入设备激活码
+            </button>
+            <div class="hero-orb hero-orb--one"></div>
+            <div class="hero-orb hero-orb--two"></div>
+          </div>
+
+          <div class="stat-grid" id="overview-stats" aria-live="polite"></div>
+
+          <div class="section-heading">
+            <div><span class="eyebrow">产品矩阵</span><h2>三款智能玩具</h2></div>
+          </div>
+          <div class="product-grid" id="overview-products"></div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">RECENT DEVICES</span><h2>最近设备</h2></div>
+              <button class="button button--ghost button--small" type="button" data-action="show-devices">查看全部</button>
+            </div>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>产品</th><th>状态</th><th>最后在线</th></tr></thead><tbody id="recent-devices"></tbody></table></div>
+            <div class="empty-state" id="recent-empty" hidden><span>⌁</span><strong>还没有设备</strong><p>输入激活码或手工添加第一台设备。</p></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-devices" data-view-panel="devices">
+          <div class="page-actions">
+            <div><p>通过激活码绑定新设备，或手工登记生产样机。</p></div>
+            <div class="button-row">
+              <button class="button button--secondary" type="button" data-action="open-activate"><svg><use href="#icon-link"></use></svg>激活码绑定</button>
+              <button class="button button--primary" type="button" data-action="open-add-device"><svg><use href="#icon-plus"></use></svg>添加设备</button>
+            </div>
+          </div>
+
+          <div class="filter-bar panel panel--compact">
+            <label class="search-field"><svg><use href="#icon-search"></use></svg><input id="device-search" placeholder="搜索名称、设备 ID 或 IP"></label>
+            <select id="device-product-filter" aria-label="按产品筛选"><option value="">全部产品</option></select>
+            <select id="device-status-filter" aria-label="按状态筛选"><option value="">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="pending">待激活</option><option value="disabled">已停用</option></select>
+          </div>
+
+          <div class="panel device-panel">
+            <div class="table-wrap"><table class="data-table device-table"><thead><tr><th>设备</th><th>产品型号</th><th>运行状态</th><th>电量</th><th>固件</th><th>最后在线</th><th></th></tr></thead><tbody id="device-list"></tbody></table></div>
+            <div class="empty-state" id="device-empty" hidden><span>⌁</span><strong>没有匹配的设备</strong><p>调整筛选条件，或添加一台新设备。</p></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-audio" data-view-panel="audio">
+          <div class="page-actions">
+            <div><p>按产品与场景管理 Opus 音频，设备会根据版本自动同步。</p></div>
+            <button class="button button--danger-ghost" id="clear-category-button" type="button"><svg><use href="#icon-trash"></use></svg>清空当前分类</button>
+          </div>
+
+          <div class="product-switcher" id="audio-products"></div>
+          <div class="category-switcher" id="audio-categories"></div>
+
+          <div class="audio-layout">
+            <section class="panel upload-panel">
+              <div class="panel-head"><div><span class="eyebrow">UPLOAD</span><h2>上传音频</h2></div><span class="file-limit">OPUS · 最大 32 MB</span></div>
+              <label class="drop-zone" id="drop-zone">
+                <input id="audio-input" type="file" accept=".opus,audio/opus" multiple>
+                <span class="drop-icon"><svg><use href="#icon-upload"></use></svg></span>
+                <strong>拖拽 Opus 文件到这里</strong>
+                <p>或点击选择文件，支持批量上传</p>
+              </label>
+              <div class="upload-queue" id="upload-queue" hidden></div>
+            </section>
+
+            <section class="panel file-panel">
+              <div class="panel-head">
+                <div><span class="eyebrow">LIBRARY</span><h2>音频文件 <span class="count-badge" id="audio-count">0</span></h2></div>
+                <label class="mini-search"><svg><use href="#icon-search"></use></svg><input id="audio-search" placeholder="搜索文件"></label>
+              </div>
+              <div class="file-list" id="audio-file-list"></div>
+              <div class="empty-state" id="audio-empty" hidden><span>♫</span><strong>当前分类还没有音频</strong><p>上传一个 Opus 文件开始构建声音库。</p></div>
+              <div class="library-foot"><span id="audio-size">共 0 B</span><span id="audio-revision">版本 —</span></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-system" data-view-panel="system">
+          <div class="settings-grid">
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">ESP32 TOOL</span><h2>设备 Flash 工具</h2></div><span class="status-dot status-dot--neutral" id="flash-dot"></span></div>
+              <p class="panel-description">通过服务端代理访问同一局域网中的 ESP32，查询或擦除外接音频 Flash。</p>
+              <div class="inline-form"><label class="field field--grow"><span>设备 IP</span><input id="flash-ip" placeholder="例如 192.168.1.88" inputmode="decimal"></label><button class="button button--secondary align-end" id="flash-query" type="button">查询状态</button></div>
+              <div class="device-result" id="flash-result"><span class="muted">尚未连接设备</span></div>
+              <button class="button button--danger-ghost" id="flash-erase" type="button"><svg><use href="#icon-trash"></use></svg>擦除设备音频 Flash</button>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">SECURITY</span><h2>管理员密码</h2></div><svg class="panel-icon"><use href="#icon-shield"></use></svg></div>
+              <p class="panel-description">定期更新管理密码。新密码至少需要 10 个字符。</p>
+              <form id="password-form" class="form-stack form-stack--compact">
+                <label class="field"><span>当前密码</span><input name="current_password" type="password" autocomplete="current-password" required></label>
+                <label class="field"><span>新密码</span><input name="new_password" type="password" autocomplete="new-password" minlength="10" required></label>
+                <label class="field"><span>确认新密码</span><input name="confirm_password" type="password" autocomplete="new-password" minlength="10" required></label>
+                <button class="button button--primary" type="submit">更新密码</button>
+              </form>
+            </section>
+
+            <section class="panel panel--wide">
+              <div class="panel-head"><div><span class="eyebrow">DEVICE FLOW</span><h2>设备接入流程</h2></div></div>
+              <div class="flow-steps">
+                <div><span>1</span><strong>设备注册</strong><p>ESP32 使用芯片 ID 与产品型号请求注册。</p></div><i></i>
+                <div><span>2</span><strong>后台激活</strong><p>管理员输入设备展示的 6 位激活码。</p></div><i></i>
+                <div><span>3</span><strong>领取令牌</strong><p>设备领取一次性 API Token 并保存至 NVS。</p></div><i></i>
+                <div><span>4</span><strong>心跳同步</strong><p>定期上报状态，按所属产品同步音频。</p></div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <dialog class="modal" id="activate-modal">
+    <form method="dialog" class="modal-card" id="activate-form">
+      <div class="modal-head"><div><span class="eyebrow">BIND DEVICE</span><h2>输入设备激活码</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <p class="modal-copy">设备首次联网后会生成 6 位激活码。输入后，该设备将绑定到当前管理平台。</p>
+      <label class="field"><span>6 位激活码</span><input class="code-input" id="activation-code" name="activation_code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="000000" autocomplete="one-time-code" required></label>
+      <div class="modal-actions"><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">确认绑定</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="add-device-modal">
+    <form method="dialog" class="modal-card" id="add-device-form">
+      <div class="modal-head"><div><span class="eyebrow">MANUAL DEVICE</span><h2>手工添加设备</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <p class="modal-copy">适用于开发样机或预先录入的量产设备。保存后会生成一次性设备令牌。</p>
+      <label class="field"><span>设备名称</span><input name="name" maxlength="80" placeholder="例如 展厅摇尾熊猫 01"></label>
+      <label class="field"><span>产品型号</span><select name="product_id" id="add-device-product" required></select></label>
+      <label class="field"><span>设备 ID / MAC</span><input name="device_uid" maxlength="64" placeholder="例如 48:27:E2:12:34:56" required></label>
+      <div class="modal-actions"><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">添加设备</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="device-modal">
+    <form method="dialog" class="modal-card" id="device-form">
+      <div class="modal-head"><div><span class="eyebrow">DEVICE DETAIL</span><h2 id="device-modal-title">设备详情</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <input type="hidden" name="id">
+      <div class="detail-strip" id="device-detail-strip"></div>
+      <label class="field"><span>设备名称</span><input name="name" maxlength="80" required></label>
+      <label class="field"><span>产品型号</span><select name="product_id" id="edit-device-product" required></select></label>
+      <label class="field"><span>设备状态</span><select name="status"><option value="active">启用</option><option value="disabled">停用</option></select></label>
+      <div class="danger-zone"><div><strong>设备凭据</strong><p>轮换后旧令牌立即失效，设备需要写入新令牌。</p></div><button class="button button--secondary button--small" id="rotate-token" type="button">轮换令牌</button></div>
+      <div class="modal-actions modal-actions--spread"><button class="button button--danger-ghost" id="delete-device" type="button">删除设备</button><span><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">保存更改</button></span></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="token-modal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">ONE-TIME TOKEN</span><h2>保存设备令牌</h2></div><button class="icon-button" data-close-dialog="token-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <div class="token-warning"><svg><use href="#icon-shield"></use></svg><p>令牌只展示这一次。关闭前请复制并安全写入设备 NVS。</p></div>
+      <div class="copy-field"><code id="device-token"></code><button class="button button--secondary button--small" id="copy-token" type="button">复制</button></div>
+      <div class="modal-actions"><button class="button button--primary" data-close-dialog="token-modal" type="button">我已保存</button></div>
+    </div>
+  </dialog>
+
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="icon-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9zM9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M19 9h4M1 15h4M19 15h4"/></symbol>
+    <symbol id="icon-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 8l11-2"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></symbol>
+    <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.1 8A7 7 0 0 1 18 6l2 6M18 16a7 7 0 0 1-12 2l-2-6"/></symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M4 21h16"/></symbol>
+  </svg>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
