@@ -130,6 +130,14 @@ class AudioHubTestCase(unittest.TestCase):
         self.assertLess(name_position, size_position)
         self.assertLess(size_position, category_position)
 
+        summary = self.client.get(
+            "/api/summary?product=tail-wagging-panda"
+        )
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.get_json()["total_size"], len(b"opus-data"))
+        dashboard = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="audio-total-size"', dashboard)
+
         download = self.client.get(
             "/api/download-idx/0?product=tail-wagging-panda"
         )

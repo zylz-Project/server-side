@@ -337,7 +337,8 @@ select, input { border: 1px solid var(--border-strong); border-radius: 9px; padd
 .file-delete { color: var(--danger); }
 .count-badge { display: inline-grid; min-width: 20px; height: 20px; margin-left: 4px; place-items: center; border-radius: 8px; background: var(--surface-3); color: var(--text-soft); font-size: 9px; vertical-align: 2px; }
 .mini-search { width: 170px; }
-.library-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--border); margin-top: 13px; padding-top: 11px; color: var(--text-faint); font-size: 9px; }
+.library-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px 14px; border-top: 1px solid var(--border); margin-top: 13px; padding-top: 11px; color: var(--text-faint); font-size: 9px; }
+#audio-total-size { color: var(--text-soft); font-weight: 700; }
 
 .empty-state { padding: 34px 15px; text-align: center; }
 .empty-state > span { display: grid; width: 48px; height: 48px; margin: 0 auto 10px; place-items: center; border-radius: 15px; background: var(--surface-3); color: var(--text-faint); font-size: 22px; }

@@ -8,6 +8,7 @@
     devices: [],
     overview: null,
     files: [],
+    audioSummary: null,
     currentProduct: "",
     currentCategory: "animal",
     view: "overview",
@@ -481,8 +482,12 @@
       product: state.currentProduct,
       category: state.currentCategory,
     });
-    const data = await api(`/api/files?${params}`);
+    const [data, summary] = await Promise.all([
+      api(`/api/files?${params}`),
+      api(`/api/summary?product=${encodeURIComponent(state.currentProduct)}`),
+    ]);
     state.files = data.files;
+    state.audioSummary = summary;
     $("#audio-revision").textContent = `版本 ${data.revision}`;
     renderAudioFiles();
   }
@@ -494,7 +499,9 @@
     root.replaceChildren();
     $("#audio-empty").hidden = files.length > 0;
     $("#audio-count").textContent = state.files.length;
-    $("#audio-size").textContent = `共 ${formatBytes(state.files.reduce((sum, file) => sum + file.size, 0))}`;
+    const categorySize = state.files.reduce((sum, file) => sum + file.size, 0);
+    $("#audio-size").textContent = `当前分类 ${formatBytes(categorySize)}`;
+    $("#audio-total-size").textContent = `当前产品总计 ${formatBytes(state.audioSummary?.total_size)}`;
     files.forEach((file) => {
       const row = document.createElement("div");
       row.className = "file-row";
