@@ -158,6 +158,34 @@ class AudioHubTestCase(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 400)
 
+    def test_audio_names_are_device_safe_across_categories(self) -> None:
+        csrf_token = self.login()
+        first = self.client.post(
+            "/api/upload",
+            data={
+                "product": "dinosaur",
+                "category": "animal",
+                "file": (io.BytesIO(b"first"), "SOUND.OPUS"),
+            },
+            headers={"X-CSRF-Token": csrf_token},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(first.status_code, 201, first.get_data(as_text=True))
+        self.assertEqual(first.get_json()["files"][0]["name"], "SOUND.opus")
+
+        duplicate = self.client.post(
+            "/api/upload",
+            data={
+                "product": "dinosaur",
+                "category": "ambient",
+                "file": (io.BytesIO(b"second"), "SOUND.opus"),
+            },
+            headers={"X-CSRF-Token": csrf_token},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertIn("另一个分类已存在同名文件", duplicate.get_json()["error"])
+
     def test_manual_device_and_authenticated_check_in(self) -> None:
         csrf_token = self.login()
         response = self.client.post(

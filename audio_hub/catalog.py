@@ -79,6 +79,7 @@ class AudioStore:
             raise AudioStoreError("文件名包含非法字符")
         if not name.lower().endswith(".opus"):
             raise AudioStoreError("只支持 .opus 文件")
+        name = f"{name[:-5]}.opus"
         if len(name.encode("utf-8")) > 63:
             raise AudioStoreError("文件名过长，UTF-8 编码后不能超过 63 字节")
         return name
@@ -95,6 +96,7 @@ class AudioStore:
 
         categories = [category_id] if category_id else list(CATEGORIES)
         files: list[dict] = []
+        seen_names: set[str] = set()
         for current_category in categories:
             directory = self.directory(product_id, current_category)
             paths = sorted(
@@ -102,11 +104,21 @@ class AudioStore:
                 key=self._sort_key,
             )
             for path in paths:
+                normalized_name = self.safe_filename(path.name)
+                if normalized_name != path.name:
+                    raise AudioStoreError(
+                        f"音频扩展名必须为小写 .opus：{path.name}"
+                    )
+                if normalized_name in seen_names:
+                    raise AudioStoreError(
+                        f"同一产品的不同分类不能使用相同文件名：{normalized_name}"
+                    )
+                seen_names.add(normalized_name)
                 stat = path.stat()
                 files.append(
                     {
                         "index": len(files),
-                        "name": path.name,
+                        "name": normalized_name,
                         "size": stat.st_size,
                         "category": current_category,
                         "modified_at": int(stat.st_mtime),
@@ -182,6 +194,13 @@ class AudioStore:
             if total == 0:
                 raise AudioStoreError("不能上传空文件")
             with self._lock:
+                for other_category in CATEGORIES:
+                    if other_category == category_id:
+                        continue
+                    if (self.directory(product_id, other_category) / name).is_file():
+                        raise AudioStoreError(
+                            f"另一个分类已存在同名文件：{name}"
+                        )
                 os.replace(temp_path, directory / name)
             temp_path = None
             return {"name": name, "size": total, "category": category_id}
