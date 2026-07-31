@@ -67,6 +67,39 @@ class AudioHubTestCase(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_short_password_is_allowed_and_dialogs_can_close(self) -> None:
+        csrf_token = self.login()
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "current_password": "test-password-123",
+                "new_password": "1",
+            },
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+
+        dashboard = self.client.get("/")
+        html = dashboard.get_data(as_text=True)
+        self.assertIn(
+            'type="button" data-close-dialog="activate-modal"',
+            html,
+        )
+        self.assertNotIn('minlength="10"', html)
+
+        response = self.client.post(
+            "/api/auth/logout",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.client.get("/login")
+        response = self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "1"},
+            headers={"X-CSRF-Token": self.csrf()},
+        )
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+
     def test_audio_upload_and_legacy_manifest(self) -> None:
         csrf_token = self.login()
         response = self.client.post(

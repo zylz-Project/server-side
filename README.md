@@ -37,7 +37,7 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 
 export AUDIO_HUB_ADMIN_USERNAME=admin
-export AUDIO_HUB_ADMIN_PASSWORD='请替换为至少10位的强密码'
+export AUDIO_HUB_ADMIN_PASSWORD='请替换为强密码'
 python3 server.py --production
 ```
 

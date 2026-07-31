@@ -164,11 +164,11 @@
 
             <section class="panel">
               <div class="panel-head"><div><span class="eyebrow">SECURITY</span><h2>管理员密码</h2></div><svg class="panel-icon"><use href="#icon-shield"></use></svg></div>
-              <p class="panel-description">定期更新管理密码。新密码至少需要 10 个字符。</p>
+              <p class="panel-description">新密码不能为空。系统允许短密码，但正式使用时仍建议设置强密码。</p>
               <form id="password-form" class="form-stack form-stack--compact">
                 <label class="field"><span>当前密码</span><input name="current_password" type="password" autocomplete="current-password" required></label>
-                <label class="field"><span>新密码</span><input name="new_password" type="password" autocomplete="new-password" minlength="10" required></label>
-                <label class="field"><span>确认新密码</span><input name="confirm_password" type="password" autocomplete="new-password" minlength="10" required></label>
+                <label class="field"><span>新密码</span><input name="new_password" type="password" autocomplete="new-password" required></label>
+                <label class="field"><span>确认新密码</span><input name="confirm_password" type="password" autocomplete="new-password" required></label>
                 <button class="button button--primary" type="submit">更新密码</button>
               </form>
             </section>
@@ -193,40 +193,40 @@
 
   <dialog class="modal" id="activate-modal">
     <form method="dialog" class="modal-card" id="activate-form">
-      <div class="modal-head"><div><span class="eyebrow">BIND DEVICE</span><h2>输入设备激活码</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <div class="modal-head"><div><span class="eyebrow">BIND DEVICE</span><h2>输入设备激活码</h2></div><button class="icon-button" type="button" data-close-dialog="activate-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
       <p class="modal-copy">设备首次联网后会生成 6 位激活码。输入后，该设备将绑定到当前管理平台。</p>
       <label class="field"><span>6 位激活码</span><input class="code-input" id="activation-code" name="activation_code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="000000" autocomplete="one-time-code" required></label>
-      <div class="modal-actions"><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">确认绑定</button></div>
+      <div class="modal-actions"><button class="button button--ghost" type="button" data-close-dialog="activate-modal">取消</button><button class="button button--primary" type="submit" value="default">确认绑定</button></div>
     </form>
   </dialog>
 
   <dialog class="modal" id="add-device-modal">
     <form method="dialog" class="modal-card" id="add-device-form">
-      <div class="modal-head"><div><span class="eyebrow">MANUAL DEVICE</span><h2>手工添加设备</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <div class="modal-head"><div><span class="eyebrow">MANUAL DEVICE</span><h2>手工添加设备</h2></div><button class="icon-button" type="button" data-close-dialog="add-device-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
       <p class="modal-copy">适用于开发样机或预先录入的量产设备。保存后会生成一次性设备令牌。</p>
       <label class="field"><span>设备名称</span><input name="name" maxlength="80" placeholder="例如 展厅摇尾熊猫 01"></label>
       <label class="field"><span>产品型号</span><select name="product_id" id="add-device-product" required></select></label>
       <label class="field"><span>设备 ID / MAC</span><input name="device_uid" maxlength="64" placeholder="例如 48:27:E2:12:34:56" required></label>
-      <div class="modal-actions"><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">添加设备</button></div>
+      <div class="modal-actions"><button class="button button--ghost" type="button" data-close-dialog="add-device-modal">取消</button><button class="button button--primary" type="submit" value="default">添加设备</button></div>
     </form>
   </dialog>
 
   <dialog class="modal" id="device-modal">
     <form method="dialog" class="modal-card" id="device-form">
-      <div class="modal-head"><div><span class="eyebrow">DEVICE DETAIL</span><h2 id="device-modal-title">设备详情</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <div class="modal-head"><div><span class="eyebrow">DEVICE DETAIL</span><h2 id="device-modal-title">设备详情</h2></div><button class="icon-button" type="button" data-close-dialog="device-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
       <input type="hidden" name="id">
       <div class="detail-strip" id="device-detail-strip"></div>
       <label class="field"><span>设备名称</span><input name="name" maxlength="80" required></label>
       <label class="field"><span>产品型号</span><select name="product_id" id="edit-device-product" required></select></label>
       <label class="field"><span>设备状态</span><select name="status"><option value="active">启用</option><option value="disabled">停用</option></select></label>
       <div class="danger-zone"><div><strong>设备凭据</strong><p>轮换后旧令牌立即失效，设备需要写入新令牌。</p></div><button class="button button--secondary button--small" id="rotate-token" type="button">轮换令牌</button></div>
-      <div class="modal-actions modal-actions--spread"><button class="button button--danger-ghost" id="delete-device" type="button">删除设备</button><span><button class="button button--ghost" value="cancel">取消</button><button class="button button--primary" type="submit" value="default">保存更改</button></span></div>
+      <div class="modal-actions modal-actions--spread"><button class="button button--danger-ghost" id="delete-device" type="button">删除设备</button><span><button class="button button--ghost" type="button" data-close-dialog="device-modal">取消</button><button class="button button--primary" type="submit" value="default">保存更改</button></span></div>
     </form>
   </dialog>
 
   <dialog class="modal" id="token-modal">
     <div class="modal-card">
-      <div class="modal-head"><div><span class="eyebrow">ONE-TIME TOKEN</span><h2>保存设备令牌</h2></div><button class="icon-button" data-close-dialog="token-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
+      <div class="modal-head"><div><span class="eyebrow">ONE-TIME TOKEN</span><h2>保存设备令牌</h2></div><button class="icon-button" type="button" data-close-dialog="token-modal" aria-label="关闭"><svg><use href="#icon-close"></use></svg></button></div>
       <div class="token-warning"><svg><use href="#icon-shield"></use></svg><p>令牌只展示这一次。关闭前请复制并安全写入设备 NVS。</p></div>
       <div class="copy-field"><code id="device-token"></code><button class="button button--secondary button--small" id="copy-token" type="button">复制</button></div>
       <div class="modal-actions"><button class="button button--primary" data-close-dialog="token-modal" type="button">我已保存</button></div>

@@ -95,8 +95,8 @@ def change_password():
     payload = request.get_json(silent=True) or {}
     current_password = str(payload.get("current_password", ""))
     new_password = str(payload.get("new_password", ""))
-    if len(new_password) < 10:
-        return api_error("新密码至少需要 10 个字符")
+    if not new_password:
+        return api_error("新密码不能为空")
 
     admin = get_db().execute("SELECT * FROM admins WHERE id = ?", (session["admin_id"],)).fetchone()
     if not admin or not check_password_hash(admin["password_hash"], current_password):

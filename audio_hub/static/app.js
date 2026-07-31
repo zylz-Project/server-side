@@ -691,6 +691,11 @@
     $$("[data-close-dialog]").forEach((button) => {
       button.addEventListener("click", () => closeDialog(button.dataset.closeDialog));
     });
+    $$("dialog.modal").forEach((dialog) => {
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+    });
     $("#mobile-menu").addEventListener("click", openMobileMenu);
     $("#mobile-overlay").addEventListener("click", closeMobileMenu);
     $("#theme-toggle").addEventListener("click", () => {
