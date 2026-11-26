@@ -1,4 +1,4 @@
-from flask import Blueprint, redirect, render_template, session, url_for
+from flask import Blueprint, current_app, redirect, render_template, session, url_for
 
 from ..security import csrf_token
 
@@ -21,4 +21,5 @@ def dashboard():
         "index.html",
         csrf_token=csrf_token(),
         username=session.get("username", "admin"),
+        auto_activate=current_app.config["DEVICE_AUTO_ACTIVATE"],
     )

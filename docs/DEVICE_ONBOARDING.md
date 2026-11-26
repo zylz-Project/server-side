@@ -1,6 +1,76 @@
 # ESP32 设备接入与绑定协议
 
+## 当前固件的出厂维护方式
+
+三款产品在开发者页面点击「连接并检查」时才发送登记和 `check-in` 请求。点击「更新选中项」后写入选定音频。设备开机和换网时不访问 Audio Hub。下文记录接口以及旧固件曾用的周期上报流程。现行操作步骤见 [出厂连接与写入](../README.md#出厂连接与写入)。
+
+## 默认登记策略（2026-10-12）
+
+默认 `AUDIO_HUB_DEVICE_AUTO_ACTIVATE=1`。ESP32 调用
+`POST /api/device/register` 后，无需管理员输入六位码即可领取令牌。
+
+注册请求仍包含 `device_id`、`product_id` 和可选的 `firmware_version`。
+首次注册返回 HTTP 201，已有设备重新注册返回 HTTP 200：
+
+```json
+{
+  "status": "active",
+  "device_id": "ZYLZ-AABBCCDDEEFF",
+  "product_id": "dinosaur",
+  "api_token": "zh_...",
+  "claim_token": "claim_...",
+  "activation_code": "",
+  "poll_after": 0
+}
+```
+
+新固件直接把 `api_token` 存入 NVS，用 Bearer Token 调用心跳接口验证后开始同步。
+重启时优先验证缓存令牌；HTTP 401 时清除失效凭据并重新注册。HTTP 403 保留令牌等待
+管理员重新启用设备，不会通过注册绕过停用。正常心跳每 60 秒一次。
+
+`claim_token` 和空字符串 `activation_code` 用于兼容旧固件：旧固件仍能调用
+`POST /api/device/activate` 获取相同令牌。已保存的待激活 Claim Token（包括六位码
+已经过期的记录）在自动模式下通过有效凭据校验后直接启用。首次成功心跳后 Claim Token 失效。
+
+已登记的设备重新注册时会签发新令牌，旧令牌随之失效；设备 ID 和管理记录保留。
+产品型号不匹配仍返回 HTTP 409；已停用设备注册仍返回 HTTP 403。
+后台令牌轮换后，新固件会自动注册恢复，持续禁止设备访问请使用停用状态。
+
+设置 `AUDIO_HUB_DEVICE_AUTO_ACTIVATE=0` 并重启服务端可以恢复下文的人工绑定流程。
+该开关不撤销已有设备的启用状态。**下文六位码、30 分钟过期和管理员绑定步骤仅适用于
+关闭自动登记的模式**；心跳、音频接口和 NVS 字段说明继续适用于两种模式。
+
+
 本文说明摇尾巴小熊猫、爬行大熊猫和互动恐龙如何接入 Audio Hub，重点说明每一步由谁发送、谁接收、谁响应。
+
+## 旧板复用与产品自动切换（2026-10-18）
+
+三个产品的新固件启动时，优先复用 NVS 中的有效令牌并发送：
+
+```http
+POST /api/device/v1/check-in
+Authorization: Bearer <该板原有令牌>
+Content-Type: application/json
+
+{"device_id":"ZYLZ-AABBCCDDEEFF","product_id":"tail-wagging-panda","firmware_version":"当前版本"}
+```
+
+服务端校验设备 ID 与令牌对应后，将产品改为当前固件上报的型号，返回
+`product_changed:true` 和新的 `device.product_id`。原有设备记录、令牌和自定义名称保留；
+默认名称随型号更新。停用设备仍返回 403，不发生迁移。旧客户端不发送这两个身份字段时，
+维持原型号；发送身份字段时，必须同时提供 `device_id` 和有效 `product_id`。
+
+固件只有在响应型号与自身 `SYNC_PRODUCT_ID` 一致时才允许同步；清单中的 `product`
+必须再次匹配，且获取清单和下载文件都带 `?product=<固件型号>`。查询参数只校验型号，
+不能绕过令牌选择其他产品；不匹配返回 409。NVS `audio_sync` 同时保存 `revision` 和
+`product_id`，换产品或旧版本缺少产品记录时强制刷新同名同大小的文件。
+
+先更新并重启服务端，再烧录目标产品固件，保留 NVS 和 Wi-Fi 配置即可。失去有效旧令牌时，
+未鉴权的重新注册仍不能改变后台已有型号，需要管理员修改型号或删除旧记录。
+
+设备本地新增只读兼容接口 `/api/device`（MAC、型号、版本、网络）、`/api/status`
+（缓存电量、关机状态、运行时间）、`/api/ota/info`（版本和 `supported:false`）。
+不模拟未实现的测试板传感器或升级功能；刷新设备首页进入当前产品控制面板。
 
 ## 1. 先分清三个角色
 
@@ -306,13 +376,15 @@ Content-Type: application/json
 
 ```json
 {
+  "device_id": "ZYLZ-AABBCCDDEEFF",
+  "product_id": "tail-wagging-panda",
   "firmware_version": "1.0.0",
   "battery_level": 82,
   "flash_free": 1572864
 }
 ```
 
-当前三个产品固件已经上报 `firmware_version`。`battery_level` 和 `flash_free` 是可选字段，固件尚未采集时可以不发送。
+当前三个产品固件已上报 `device_id`、`product_id` 和 `firmware_version`。`battery_level` 和 `flash_free` 是可选字段，固件尚未采集时可以不发送。
 
 ### 服务端处理
 
@@ -391,19 +463,11 @@ Authorization: Bearer zh_...
 
 如果使用 `?category=animal` 或 `?category=ambient` 获取分类清单，下载时必须携带相同的分类参数，因为索引是相对于当前清单生成的。
 
-### 当前兼容接口
+### 当前下载接口与旧接口兼容
 
-目前三套固件的 `sync_audio.cc` 仍使用旧接口下载音频：
-
-```text
-ESP32 → GET /api/files?product=<product_id> → Audio Hub
-ESP32 ← JSON 音频清单 ← Audio Hub
-
-ESP32 → GET /api/download-idx/<index>?product=<product_id> → Audio Hub
-ESP32 ← Opus 二进制文件 ← Audio Hub
-```
-
-这两个兼容接口暂时不要求设备令牌。设备注册和心跳已经使用新协议，后续把 `sync_audio.cc` 切换到 `/api/device/v1/*` 后，才能安全关闭旧接口。
+三套固件已使用 Bearer Token 访问 `/api/device/v1/files?product=<product_id>` 和
+`/api/device/v1/download/<index>?product=<product_id>`。服务器仍保留不要求设备令牌的
+`/api/files` 和 `/api/download-idx`，用于兼容更早的工具；新固件不使用它们。
 
 三个产品固件会把响应中的 `revision` 保存到 ESP32 NVS（命名空间 `audio_sync`）。
 当服务端清单版本变化时，ESP32 会刷新现有文件，而不只比较“文件名 + 文件大小”。

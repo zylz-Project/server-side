@@ -12,3 +12,8 @@ data/
 # Editor and operating-system files.
 .idea/
 .DS_Store
+
+# 候选音频生成工作区（约 232MB 的试听素材），不属于服务端运行内容。
+候选音频/
+# audio_files/ 的重复压缩包，源文件已直接入库。
+audio_files.zip

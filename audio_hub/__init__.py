@@ -10,6 +10,8 @@ from flask import Flask, jsonify, request
 
 from .catalog import AudioStore
 from .database import close_db, ensure_admin, init_db
+from .device_voice import DeviceVoiceSessions
+from .voice_keys import load_vault
 
 
 def _load_or_create_secret(data_dir: Path) -> str:
@@ -28,6 +30,16 @@ def _load_or_create_secret(data_dir: Path) -> str:
     except OSError:
         pass
     return value
+
+
+def _local_device_credential(data_dir: Path) -> str:
+    configured = os.environ.get("AUDIO_HUB_DEVICE_DEVELOPER_PASSWORD", "")
+    if configured:
+        return configured
+    try:
+        return (data_dir / "device-console.password").read_text(encoding="utf-8").rstrip("\r\n")
+    except (OSError, UnicodeError):
+        return ""
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -51,6 +63,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         MAX_CONTENT_LENGTH=128 * 1024 * 1024,
         DEVICE_ONLINE_SECONDS=120,
         ACTIVATION_TTL_SECONDS=30 * 60,
+        DEVICE_AUTO_ACTIVATE=os.environ.get("AUDIO_HUB_DEVICE_AUTO_ACTIVATE", "1") == "1",
+        DEVICE_DEVELOPER_PASSWORD=_local_device_credential(data_dir),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("AUDIO_HUB_COOKIE_SECURE") == "1",
@@ -73,6 +87,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     store = AudioStore(Path(app.config["AUDIO_DIR"]), app.config["MAX_FILE_SIZE"])
     store.ensure_directories()
     app.extensions["audio_store"] = store
+    app.extensions["voice_vault"] = load_vault(runtime_data_dir)
+    app.extensions["device_voice_sessions"] = DeviceVoiceSessions()
 
     init_db(app)
     generated_password = ensure_admin(app)
@@ -86,12 +102,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     from .routes.devices import devices_bp
     from .routes.pages import pages_bp
     from .routes.system import system_bp
+    from .routes.voices import voices_bp
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(audio_bp)
     app.register_blueprint(devices_bp)
     app.register_blueprint(system_bp)
+    app.register_blueprint(voices_bp)
     app.teardown_appcontext(close_db)
 
     @app.after_request
@@ -104,7 +122,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
             "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",
         )
-        if request.path.startswith("/api/auth") or request.path in {"/", "/login"}:
+        if request.path.startswith(("/api/auth", "/api/admin/")) or request.path in {"/", "/login"}:
             response.headers["Cache-Control"] = "no-store"
         return response
 

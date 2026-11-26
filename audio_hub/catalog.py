@@ -16,6 +16,8 @@ PRODUCTS = {
         "id": "tail-wagging-panda",
         "name": "摇尾巴小熊猫",
         "short_name": "摇尾熊猫",
+        "ap_prefix": "RedPanda",
+        "console_build": "wzh-tailredpanda",
         "emoji": "🦊",
         "color": "#f47a3c",
         "description": "头部与双轴尾巴互动玩具",
@@ -25,6 +27,8 @@ PRODUCTS = {
         "id": "crawling-panda",
         "name": "爬行大熊猫",
         "short_name": "爬行熊猫",
+        "ap_prefix": "CrawlPanda",
+        "console_build": "wzh-crawlpanda",
         "emoji": "🐼",
         "color": "#13a66a",
         "description": "头部与双臂爬行动作玩具",
@@ -34,6 +38,8 @@ PRODUCTS = {
         "id": "dinosaur",
         "name": "互动恐龙",
         "short_name": "恐龙",
+        "ap_prefix": "Dino",
+        "console_build": "wzh-dinosaur",
         "emoji": "🦖",
         "color": "#3b82f6",
         "description": "五关节动作互动玩具",
@@ -56,6 +62,7 @@ class AudioStore:
         self.root = root.resolve()
         self.max_file_size = max_file_size
         self._lock = threading.RLock()
+        self._snapshots: dict[str, tuple[tuple, list[dict], str]] = {}
 
     def ensure_directories(self) -> None:
         for product_id in PRODUCTS:
@@ -84,77 +91,94 @@ class AudioStore:
             raise AudioStoreError("文件名过长，UTF-8 编码后不能超过 63 字节")
         return name
 
-    @staticmethod
-    def _sort_key(path: Path) -> tuple[str, str]:
-        return path.name.casefold(), path.name
-
-    def manifest(self, product_id: str, category_id: str | None = None) -> list[dict]:
+    def _snapshot(self, product_id: str) -> tuple[list[dict], str]:
         if product_id not in PRODUCTS:
             raise AudioStoreError("无效的产品 ID")
+        # Read metadata on every request so uploads and external replacements are
+        # visible immediately. Cache sorting/validation/hashing, not freshness.
+        with self._lock:
+            entries = []
+            for category in CATEGORIES:
+                with os.scandir(self.directory(product_id, category)) as iterator:
+                    for entry in iterator:
+                        if not entry.name.lower().endswith(".opus"):
+                            continue
+                        try:
+                            if not entry.is_file():
+                                continue
+                            stat = entry.stat()
+                        except FileNotFoundError:
+                            continue  # An external tool removed it during the scan.
+                        entries.append((category, entry.name, stat.st_size,
+                                        stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino))
+            category_order = {name: index for index, name in enumerate(CATEGORIES)}
+            entries.sort(key=lambda item: (category_order[item[0]], item[1].casefold(), item[1]))
+            signature = tuple(entries)
+            cached = self._snapshots.get(product_id)
+            if cached and cached[0] == signature:
+                return cached[1], cached[2]
+
+            files = []
+            names = set()
+            digest = hashlib.sha256()
+            for category, name, size, mtime_ns, _ctime_ns, _inode in entries:
+                normalized = self.safe_filename(name)
+                if normalized != name:
+                    raise AudioStoreError(f"音频扩展名必须为小写 .opus：{name}")
+                if name in names:
+                    raise AudioStoreError(f"同一产品的不同分类不能使用相同文件名：{name}")
+                names.add(name)
+                files.append({
+                    "index": len(files), "name": name, "size": size,
+                    "category": category, "modified_at": mtime_ns // 1_000_000_000,
+                    "modified_at_ns": mtime_ns,
+                })
+                # Preserve the existing revision format to avoid a redundant sync
+                # when deploying this server update.
+                digest.update(f"{category}\0{name}\0{size}\0{mtime_ns}\n".encode("utf-8"))
+            revision = digest.hexdigest()[:16]
+            self._snapshots[product_id] = (signature, files, revision)
+            return files, revision
+
+    @staticmethod
+    def _summary(product_id: str, files: list[dict], revision: str) -> dict:
+        totals = {
+            key: {"id": key, "name": category["name"], "emoji": category["emoji"],
+                  "count": 0, "size": 0}
+            for key, category in CATEGORIES.items()
+        }
+        for item in files:
+            totals[item["category"]]["count"] += 1
+            totals[item["category"]]["size"] += item["size"]
+        return {
+            "product": product_id, "totals": totals, "total": len(files),
+            "total_size": sum(item["size"] for item in files), "revision": revision,
+        }
+
+    def listing(self, product_id: str, category_id: str | None = None,
+                include_summary: bool = False) -> dict:
         if category_id and category_id not in CATEGORIES:
             raise AudioStoreError("无效的音频分类")
+        files, revision = self._snapshot(product_id)
+        selected = [dict(item) for item in files
+                    if not category_id or item["category"] == category_id]
+        for index, item in enumerate(selected):
+            item["index"] = index
+        payload = {"product": product_id, "category": category_id or "all",
+                   "revision": revision, "files": selected}
+        if include_summary:
+            payload["summary"] = self._summary(product_id, files, revision)
+        return payload
 
-        categories = [category_id] if category_id else list(CATEGORIES)
-        files: list[dict] = []
-        seen_names: set[str] = set()
-        for current_category in categories:
-            directory = self.directory(product_id, current_category)
-            paths = sorted(
-                (path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".opus"),
-                key=self._sort_key,
-            )
-            for path in paths:
-                normalized_name = self.safe_filename(path.name)
-                if normalized_name != path.name:
-                    raise AudioStoreError(
-                        f"音频扩展名必须为小写 .opus：{path.name}"
-                    )
-                if normalized_name in seen_names:
-                    raise AudioStoreError(
-                        f"同一产品的不同分类不能使用相同文件名：{normalized_name}"
-                    )
-                seen_names.add(normalized_name)
-                stat = path.stat()
-                files.append(
-                    {
-                        "index": len(files),
-                        "name": normalized_name,
-                        "size": stat.st_size,
-                        "category": current_category,
-                        "modified_at": int(stat.st_mtime),
-                        "modified_at_ns": stat.st_mtime_ns,
-                    }
-                )
-        return files
+    def manifest(self, product_id: str, category_id: str | None = None) -> list[dict]:
+        return self.listing(product_id, category_id)["files"]
 
     def revision(self, product_id: str) -> str:
-        digest = hashlib.sha256()
-        for item in self.manifest(product_id):
-            digest.update(
-                f"{item['category']}\0{item['name']}\0{item['size']}\0{item['modified_at_ns']}\n".encode(
-                    "utf-8"
-                )
-            )
-        return digest.hexdigest()[:16]
+        return self._snapshot(product_id)[1]
 
     def summary(self, product_id: str) -> dict:
-        totals = {}
-        for category_id, category in CATEGORIES.items():
-            files = self.manifest(product_id, category_id)
-            totals[category_id] = {
-                "id": category_id,
-                "name": category["name"],
-                "emoji": category["emoji"],
-                "count": len(files),
-                "size": sum(item["size"] for item in files),
-            }
-        return {
-            "product": product_id,
-            "totals": totals,
-            "total": sum(item["count"] for item in totals.values()),
-            "total_size": sum(item["size"] for item in totals.values()),
-            "revision": self.revision(product_id),
-        }
+        files, revision = self._snapshot(product_id)
+        return self._summary(product_id, files, revision)
 
     def path_by_name(self, product_id: str, filename: str, category_id: str | None = None) -> Path:
         name = self.safe_filename(filename)
@@ -202,6 +226,7 @@ class AudioStore:
                             f"另一个分类已存在同名文件：{name}"
                         )
                 os.replace(temp_path, directory / name)
+                self._snapshots.pop(product_id, None)
             temp_path = None
             return {"name": name, "size": total, "category": category_id}
         finally:
@@ -216,6 +241,7 @@ class AudioStore:
                 raise FileNotFoundError(name)
             size = path.stat().st_size
             path.unlink()
+            self._snapshots.pop(product_id, None)
         return {"name": name, "size": size, "category": category_id}
 
     def clear(self, product_id: str, category_id: str) -> int:
@@ -226,4 +252,5 @@ class AudioStore:
                 if path.is_file() and path.suffix.lower() == ".opus":
                     path.unlink()
                     count += 1
+            self._snapshots.pop(product_id, None)
         return count

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from audio_hub import create_app
+from audio_hub.discovery import start_lan_discovery
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,8 +58,10 @@ def main() -> None:
             from waitress import serve
         except ImportError as exc:  # pragma: no cover - depends on deployment extras
             raise SystemExit("生产模式需要安装依赖：python3 -m pip install waitress") from exc
+        start_lan_discovery(app, args.host, args.port)
         serve(app, host=args.host, port=args.port, threads=8)
     else:
+        start_lan_discovery(app, args.host, args.port)
         app.run(host=args.host, port=args.port, debug=False, threaded=True)
 
 

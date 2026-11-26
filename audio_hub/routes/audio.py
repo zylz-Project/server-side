@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request
 
 from ..catalog import CATEGORIES, PRODUCTS, AudioStoreError
+from ..downloads import send_audio
 from ..security import api_error, csrf_protect, login_required
 
 
@@ -49,15 +50,7 @@ def files():
     product_id = _product_id()
     category_id = _category_id()
     try:
-        items = _store().manifest(product_id, category_id)
-        return _nocache(
-            jsonify(
-                product=product_id,
-                category=category_id or "all",
-                revision=_store().revision(product_id),
-                files=items,
-            )
-        )
+        return _nocache(jsonify(_store().listing(product_id, category_id)))
     except AudioStoreError as exc:
         return api_error(str(exc))
 
@@ -66,7 +59,7 @@ def files():
 def download(filename: str):
     try:
         path = _store().path_by_name(_product_id(), filename, _category_id())
-        return send_file(path, mimetype="application/octet-stream", download_name=path.name, conditional=False)
+        return send_audio(path)
     except AudioStoreError as exc:
         return api_error(str(exc))
     except FileNotFoundError:
@@ -77,11 +70,34 @@ def download(filename: str):
 def download_index(index: int):
     try:
         path = _store().path_by_index(_product_id(), index, _category_id())
-        return send_file(path, mimetype="application/octet-stream", download_name=path.name, conditional=False)
+        return send_audio(path)
     except AudioStoreError as exc:
         return api_error(str(exc))
     except FileNotFoundError:
         return api_error("音频索引不存在", 404)
+
+
+@audio_bp.get("/admin/audio")
+@login_required
+def admin_audio():
+    try:
+        return _nocache(jsonify(_store().listing(
+            _product_id(), _category_id(), include_summary=True,
+        )))
+    except AudioStoreError as exc:
+        return api_error(str(exc))
+
+
+@audio_bp.get("/admin/audio/preview/<path:filename>")
+@login_required
+def preview_audio(filename: str):
+    try:
+        path = _store().path_by_name(_product_id(), filename, _category_id(required=True))
+        return send_audio(path, mimetype="audio/ogg")
+    except AudioStoreError as exc:
+        return api_error(str(exc))
+    except FileNotFoundError:
+        return api_error("音频文件不存在", 404)
 
 
 @audio_bp.post("/upload")

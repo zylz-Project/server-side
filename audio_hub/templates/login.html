@@ -11,33 +11,20 @@
 </head>
 <body class="login-body">
   <main class="login-layout">
-    <section class="login-visual" aria-label="产品平台介绍">
-      <div class="login-visual__glow login-visual__glow--one"></div>
-      <div class="login-visual__glow login-visual__glow--two"></div>
-      <div class="login-brand">
-        <span class="brand-mark" aria-hidden="true">A</span>
-        <span>Audio Hub</span>
-      </div>
-      <div class="login-copy">
-        <span class="eyebrow eyebrow--light">ZYLZ DEVICE CLOUD</span>
-        <h1>让每一台智能玩具<br>都有清晰的身份与声音。</h1>
-        <p>集中管理三款产品、设备激活、在线状态和 Opus 音频下发。</p>
-      </div>
-      <div class="login-products" aria-label="支持的产品">
-        <div><span>🦊</span><strong>摇尾熊猫</strong></div>
-        <div><span>🐼</span><strong>爬行熊猫</strong></div>
-        <div><span>🦖</span><strong>互动恐龙</strong></div>
+    <section class="login-visual" aria-label="Audio Hub">
+      <div>
+        <div class="login-brand"><span class="brand-mark" aria-hidden="true">A</span> Audio Hub</div>
+        <h1>设备出厂工作台</h1>
+        <p>在工厂局域网管理设备、离线音频和百炼 Key。</p>
       </div>
     </section>
 
     <section class="login-panel">
       <div class="login-card">
-        <div class="login-card__head">
-          <span class="mobile-brand"><span class="brand-mark">A</span> Audio Hub</span>
-          <span class="eyebrow">管理控制台</span>
-          <h2>欢迎回来</h2>
-          <p>使用管理员账号登录设备管理平台</p>
-        </div>
+        <header>
+          <span class="mobile-brand"><span class="brand-mark" aria-hidden="true">A</span> Audio Hub</span>
+          <h1>管理员登录</h1>
+        </header>
 
         <form id="login-form" class="form-stack" novalidate>
           <label class="field">
@@ -51,14 +38,14 @@
             <span>密码</span>
             <span class="input-wrap">
               <svg class="input-icon" aria-hidden="true"><use href="#icon-lock"></use></svg>
-              <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+              <input id="password" name="password" type="password" autocomplete="current-password" required>
               <button class="icon-button input-action" type="button" id="toggle-password" aria-label="显示密码">
                 <svg><use href="#icon-eye"></use></svg>
               </button>
             </span>
           </label>
           <div id="login-error" class="form-error" role="alert" hidden></div>
-          <button class="button button--primary button--large" id="login-button" type="submit">
+          <button class="button button--primary" id="login-button" type="submit">
             <span>登录控制台</span>
             <svg><use href="#icon-arrow"></use></svg>
           </button>
